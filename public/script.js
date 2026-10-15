@@ -36,7 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedService = service.textContent.trim();
 
       services.forEach(item => {
-        item.classList.toggle("selected", item === service);
+        item.classList.toggle(
+          "selected",
+          item === service
+        );
       });
     });
   });
@@ -45,11 +48,11 @@ document.addEventListener("DOMContentLoaded", () => {
   textarea.maxLength = 500;
 
   textarea.addEventListener("input", () => {
-    charCount.textContent = `${textarea.value.length}/500`;
+    charCount.textContent =
+      `${textarea.value.length}/500`;
   });
 
-  
-  // Send customer feedback through the Cloudflare backend
+  // Send feedback to Cloudflare
   submitButton.addEventListener("click", async () => {
     if (rating === 0) {
       alert("Please select a star rating.");
@@ -78,18 +81,19 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       if (!response.ok) {
-        throw new Error("Feedback submission failed");
+        throw new Error(
+          `Submission failed: ${response.status}`
+        );
       }
 
       alert("Thank you! Your feedback has been submitted.");
-
       submitButton.textContent = "Feedback Submitted ✓";
 
     } catch (error) {
+      console.error(error);
       alert("Something went wrong. Please try again.");
       submitButton.disabled = false;
       submitButton.textContent = "Submit Feedback →";
     }
   });
-
 });
