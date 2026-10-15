@@ -1,0 +1,11 @@
+
+{
+  "name": "auto-feedback-demo",
+  "main": "./worker/index.js",
+  "compatibility_date": "2026-10-15",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  }
+}
