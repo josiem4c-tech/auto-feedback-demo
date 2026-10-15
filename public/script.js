@@ -48,8 +48,9 @@ document.addEventListener("DOMContentLoaded", () => {
     charCount.textContent = `${textarea.value.length}/500`;
   });
 
-  // Demo submission (not connected to Make yet)
-  submitButton.addEventListener("click", () => {
+  
+  // Send customer feedback through the Cloudflare backend
+  submitButton.addEventListener("click", async () => {
     if (rating === 0) {
       alert("Please select a star rating.");
       return;
@@ -60,6 +61,34 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    alert("Demo only: Your feedback is ready! We'll connect real submissions to Make next.");
+    submitButton.disabled = true;
+    submitButton.textContent = "Submitting...";
+
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          rating: rating,
+          service: selectedService,
+          comment: textarea.value.trim()
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Feedback submission failed");
+      }
+
+      alert("Thank you! Your feedback has been submitted.");
+
+      submitButton.textContent = "Feedback Submitted ✓";
+
+    } catch (error) {
+      alert("Something went wrong. Please try again.");
+      submitButton.disabled = false;
+      submitButton.textContent = "Submit Feedback →";
+    }
   });
-});
+
