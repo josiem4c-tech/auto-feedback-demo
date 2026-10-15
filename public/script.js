@@ -86,8 +86,43 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       }
 
-      alert("Thank you! Your feedback has been submitted.");
-      submitButton.textContent = "Feedback Submitted ✓";
+      
+      // Show the premium thank-you screen
+      const thankYouScreen = document.getElementById("thank-you-screen");
+      const feedbackForm = document.querySelector(".app-shell");
+      const copyButton = document.getElementById("copy-feedback-btn");
+      const googleButton = document.getElementById("google-review-btn");
+
+      // Keep a copy of the customer's feedback
+      const customerFeedback = textarea.value.trim();
+
+      // Hide the form and show confirmation
+      feedbackForm.hidden = true;
+      feedbackForm.style.display = "none";
+      thankYouScreen.hidden = false;
+
+      // Prevent the placeholder Google link from navigating
+      googleButton.removeAttribute("href");
+      googleButton.setAttribute("aria-disabled", "true");
+      googleButton.title = "Google Reviews coming soon";
+
+      // Allow customers to copy their feedback
+      copyButton.addEventListener("click", async () => {
+        if (!customerFeedback) {
+          copyButton.textContent = "No written feedback to copy";
+          return;
+        }
+
+        try {
+          await navigator.clipboard.writeText(customerFeedback);
+          copyButton.textContent = "Copied! ✓";
+        } catch {
+          copyButton.textContent = "Unable to copy automatically";
+        }
+      });
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+
 
     } catch (error) {
       console.error(error);
