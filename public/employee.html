@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APEX | Employee Checkout</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101318;
+      color: #fff;
+      min-height: 100vh;
+    }
+    header {
+      background: #191e26;
+      padding: 22px;
+      text-align: center;
+      border-bottom: 1px solid #343b46;
+    }
+    header h1 { margin: 0; letter-spacing: 3px; }
+    header p { color: #aab4c3; font-size: 13px; }
+    main {
+      max-width: 480px;
+      margin: 50px auto;
+      padding: 25px;
+      background: #1c222b;
+      border-radius: 16px;
+    }
+    label { display: block; margin-bottom: 10px; }
+    input {
+      width: 100%;
+      padding: 15px;
+      border-radius: 9px;
+      border: 1px solid #465160;
+      background: #11161d;
+      color: white;
+      font-size: 18px;
+    }
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 15px;
+      border: 0;
+      border-radius: 9px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #d6a957;
+      color: #171717;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .result {
+      margin-top: 20px;
+      padding: 18px;
+      border-radius: 10px;
+      background: #28303b;
+      display: none;
+    }
+    .eligible { border-left: 4px solid #39c989; }
+    .ineligible { border-left: 4px solid #ed6c6c; }
+    .error { border-left: 4px solid #e5ae50; }
+    .muted { color: #aab4c3; font-size: 13px; }
+    @media(max-width: 540px) {
+      main { margin: 20px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>APEX</h1>
+    <p>EMPLOYEE CHECKOUT</p>
+  </header>
+
+  <main>
+    <h2>Customer Lookup</h2>
+    <p class="muted">Check eligibility before requesting feedback.</p>
+
+    <label for="phone">Customer phone number</label>
+    <input id="phone" type="tel"
+      placeholder="(210) 555-0100"
+      autocomplete="off">
+
+    <button id="lookup">Check Eligibility</button>
+
+    <section id="result" class="result" aria-live="polite">
+      <h3 id="status"></h3>
+      <p id="message"></p>
+      <button id="record" style="display:none">
+        Mark as Asked
+      </button>
+    </section>
+  </main>
+
+  <script>
+    // Temporary local configuration.
+    // Do not put a private webhook URL in public GitHub.
+    const WEBHOOK_URL = "";
+
+    const phoneInput = document.getElementById("phone");
+    const lookupButton = document.getElementById("lookup");
+    const recordButton = document.getElementById("record");
+    const result = document.getElementById("result");
+    const statusText = document.getElementById("status");
+    const messageText = document.getElementById("message");
+
+    let checkedPhone = null;
+
+    function showResult(title, message, type, canRecord = false) {
+      result.style.display = "block";
+      result.className = "result " + type;
+      statusText.textContent = title;
+      messageText.textContent = message;
+      recordButton.style.display = canRecord ? "block" : "none";
+    }
+
+    function normalizePhone(value) {
+      const digits = value.replace(/\D/g, "");
+      if (digits.length === 11 && digits.startsWith("1")) {
+        return digits.slice(1);
+      }
+      return digits.length === 10 ? digits : null;
+    }
+
+    async function sendEvent(eventType, phoneNumber) {
+      if (!WEBHOOK_URL) {
+        throw new Error("Backend connection has not been configured.");
+      }
+
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_type: eventType,
+          business_id: "apex-auto-spa",
+          phone_number: phoneNumber
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Server returned HTTP " + response.status);
+      }
+
+      const data = await response.json();
+      if (data.success !== true) {
+        throw new Error(data.message || "Request failed.");
+      }
+      return data;
+    }
+
+    lookupButton.addEventListener("click", async () => {
+      checkedPhone = null;
+      recordButton.style.display = "none";
+
+      const phone = normalizePhone(phoneInput.value);
+      if (!phone) {
+        showResult("Invalid Number",
+          "Enter a valid 10-digit US phone number.", "error");
+        return;
+      }
+
+      lookupButton.disabled = true;
+      showResult("Checking", "Looking up customer...", "error");
+
+      try {
+        const data = await sendEvent("customer_lookup", phone);
+        checkedPhone = data.eligible === true ? phone : null;
+
+        if (data.eligible === true) {
+          showResult("Eligible",
+            data.message || "Customer can be asked for feedback.",
+            "eligible", true);
+        } else {
+          showResult("Not Eligible",
+            data.message || "Do not request feedback.",
+            "ineligible");
+        }
+      } catch (error) {
+        showResult("Lookup Failed", error.message, "error");
+      } finally {
+        lookupButton.disabled = false;
+      }
+    });
+
+    phoneInput.addEventListener("input", () => {
+      checkedPhone = null;
+      result.style.display = "none";
+      recordButton.style.display = "none";
+    });
+
+    recordButton.addEventListener("click", async () => {
+      if (!checkedPhone) return;
+
+      recordButton.disabled = true;
+
+      try {
+        const data = await sendEvent(
+          "invitation_recorded", checkedPhone
+        );
+
+        showResult("Invitation Recorded",
+          data.message || "Customer invitation recorded.",
+          "eligible");
+        checkedPhone = null;
+      } catch (error) {
+        showResult("Recording Failed", error.message, "error", true);
+      } finally {
+        recordButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
