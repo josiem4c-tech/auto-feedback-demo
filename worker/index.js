@@ -1,4 +1,8 @@
 
+import { jwtVerify, createRemoteJWKSet } from "jose";
+
+const keySets = new Map();
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -15,6 +19,54 @@ export default {
   }
 };
 
+async function verifyEmployee(request, env) {
+  if (!env.TEAM_DOMAIN || !env.POLICY_AUD) {
+    return { ok: false, status: 503 };
+  }
+
+  const token = request.headers.get(
+    "Cf-Access-Jwt-Assertion"
+  );
+
+  if (!token) {
+    return { ok: false, status: 401 };
+  }
+
+  try {
+    const issuer = env.TEAM_DOMAIN.replace(/\/+$/, "");
+
+    if (!keySets.has(issuer)) {
+      keySets.set(
+        issuer,
+        createRemoteJWKSet(
+          new URL(issuer + "/cdn-cgi/access/certs")
+        )
+      );
+    }
+
+    const { payload } = await jwtVerify(
+      token,
+      keySets.get(issuer),
+      {
+        issuer,
+        audience: env.POLICY_AUD,
+        algorithms: ["RS256"]
+      }
+    );
+
+    if (typeof payload.email !== "string") {
+      return { ok: false, status: 403 };
+    }
+
+    return {
+      ok: true,
+      email: payload.email
+    };
+  } catch {
+    return { ok: false, status: 401 };
+  }
+}
+
 async function handleEmployee(request, env, url) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", {
@@ -27,16 +79,15 @@ async function handleEmployee(request, env, url) {
     return new Response("Forbidden", { status: 403 });
   }
 
-  if (!env.EMPLOYEE_API_KEY) {
-    return new Response("Employee access not configured", {
-      status: 503
-    });
-  }
+  const auth = await verifyEmployee(request, env);
 
-  const token = request.headers.get("Authorization");
-
-  if (token !== `Bearer ${env.EMPLOYEE_API_KEY}`) {
-    return new Response("Unauthorized", { status: 401 });
+  if (!auth.ok) {
+    return new Response(
+      auth.status === 503
+        ? "Authentication not configured"
+        : "Unauthorized",
+      { status: auth.status }
+    );
   }
 
   if (!env.MAKE_WEBHOOK_URL) {
@@ -68,7 +119,9 @@ async function handleEmployee(request, env, url) {
 
     data = JSON.parse(raw);
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return new Response("Invalid JSON", {
+      status: 400
+    });
   }
 
   const validEvents = [
@@ -111,7 +164,7 @@ async function handleEmployee(request, env, url) {
     const result = await response.json();
 
     if (
-      typeof result.success !== "boolean" ||
+      result.success !== true ||
       (
         data.event_type === "customer_lookup" &&
         typeof result.eligible !== "boolean"
@@ -123,9 +176,10 @@ async function handleEmployee(request, env, url) {
     }
 
     return Response.json(result, {
-      headers: { "Cache-Control": "no-store" }
+      headers: {
+        "Cache-Control": "no-store"
+      }
     });
-
   } catch {
     return new Response("Backend unavailable", {
       status: 502
@@ -133,6 +187,7 @@ async function handleEmployee(request, env, url) {
   }
 }
 
+// Preserve the existing public feedback endpoint.
 async function handleFeedback(request, env, url) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", {
@@ -144,7 +199,9 @@ async function handleFeedback(request, env, url) {
   const origin = request.headers.get("Origin");
 
   if (origin !== url.origin) {
-    return new Response("Forbidden", { status: 403 });
+    return new Response("Forbidden", {
+      status: 403
+    });
   }
 
   const contentLength = Number(
@@ -162,10 +219,13 @@ async function handleFeedback(request, env, url) {
   try {
     data = await request.json();
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return new Response("Invalid JSON", {
+      status: 400
+    });
   }
 
   const rating = Number(data.rating);
+
   const services = [
     "Full Detail",
     "Interior Detail",
@@ -183,11 +243,15 @@ async function handleFeedback(request, env, url) {
     typeof data.comment !== "string" ||
     data.comment.length > 500
   ) {
-    return new Response("Invalid feedback", { status: 400 });
+    return new Response("Invalid feedback", {
+      status: 400
+    });
   }
 
   if (!env.MAKE_WEBHOOK_URL) {
-    return new Response("Not configured", { status: 503 });
+    return new Response("Not configured", {
+      status: 503
+    });
   }
 
   const payload = {
@@ -202,7 +266,9 @@ async function handleFeedback(request, env, url) {
   try {
     const result = await fetch(env.MAKE_WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(payload)
     });
 
