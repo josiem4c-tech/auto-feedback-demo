@@ -7,5 +7,9 @@
     "directory": "./public",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "TEAM_DOMAIN": "https://tiny-forest-bb5f.cloudflareaccess.com",
+    "POLICY_AUD": "039e1caaadda8094147d2d920802047ed7d882eecd29ed526adbe7c38b47b07b"
   }
 }
