@@ -180,11 +180,23 @@ async function handleEmployee(request, env, url) {
         "Cache-Control": "no-store"
       }
     });
-  } catch {
-    return new Response("Backend unavailable", {
-      status: 502
-    });
-  }
+  
+} catch (error) {
+  console.error("APEX employee backend error", {
+    type: error?.name || "UnknownError",
+    message:
+      error instanceof SyntaxError
+        ? "Invalid JSON returned by backend"
+        : error instanceof TypeError
+          ? "Outbound request or response-processing error"
+          : "Unexpected backend error"
+  });
+
+  return new Response("Backend unavailable", {
+    status: 502
+  });
+}
+
 }
 
 // Preserve the existing public feedback endpoint.
