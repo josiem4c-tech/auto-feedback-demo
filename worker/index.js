@@ -216,6 +216,27 @@ async function handleFeedback(request, env, url) {
     });
   }
 
+  // Rate-limit public feedback submissions.
+  const clientIP = request.headers.get("CF-Connecting-IP");
+
+  const { success: withinLimit } =
+    await env.FEEDBACK_RATE_LIMITER.limit({
+      key: `feedback:${clientIP || "unknown"}`
+    });
+
+  if (!withinLimit) {
+    return new Response(
+      "Too many submissions. Please try again later.",
+      {
+        status: 429,
+        headers: {
+          "Retry-After": "60",
+          "Cache-Control": "no-store"
+        }
+      }
+    );
+  }
+
   const contentLength = Number(
     request.headers.get("Content-Length") || 0
   );
