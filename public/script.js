@@ -80,11 +80,19 @@ document.addEventListener("DOMContentLoaded", () => {
         })
       });
 
-      if (!response.ok) {
-        throw new Error(
-          `Submission failed: ${response.status}`
-        );
-      }
+      
+if (!response.ok) {
+  if (response.status === 429) {
+    throw new Error(
+      "Too many submissions. Please wait about a minute and try again."
+    );
+  }
+
+  throw new Error(
+    `Submission failed: ${response.status}`
+  );
+}
+
 
       
       // Show the premium thank-you screen
@@ -126,7 +134,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (error) {
       console.error(error);
-      alert("Something went wrong. Please try again.");
+      
+alert(
+  error.message.includes("Too many submissions")
+    ? error.message
+    : "Something went wrong. Please try again."
+);
+
       submitButton.disabled = false;
       submitButton.textContent = "Submit Feedback →";
     }
